@@ -622,23 +622,41 @@ function delBoss(i){ if(S.bosses.length<=1){alert('ต้องมีผู้�
 /* ===== string builders (ตรงฟอร์มเดิม) ===== */
 function buildE1(loc){ return `เลขที่…………………………….     เลขที่ ตจ/กฟฟ…………………………..งบ……${loc.place}…….………..หมายเลขงาน…......................................................................................……`; }
 function buildE2(p,st){ return `ชื่อผู้เบิก…${p.name}…………….เลขประจำตัว…${p.id}………ตำแหน่ง……${p.pos}…….สังกัด……${st.dept}……………….รหัสแผนก…………………...………`; }
-/* จัดบล็อกให้ "กึ่งกลาง" ตรงช่องจุดไข่ปลาที่เว้นเซ็นของแถวบน (คอลัมน์กลาง ≈ 29.5 / 104.5 / 174) */
-const SIG_CEN=[29.5,104.5,174];
-function _placeAt(text,c){ return {start:Math.max(0,Math.round(c-text.length/2)), text}; }
-function _lineFrom(segs){ let s=''; for(const g of segs){ if(g.start>s.length) s+=' '.repeat(g.start-s.length); else if(s.length) s+=' '; s+=g.text; } return s; }
-function buildA52(p,st){
-  const nm=_placeAt(`(${p.name})`, SIG_CEN[0]); nm.text+='  เบอร์ภายใน…………..';
-  const bs=_placeAt(`(…........${st.boss}........)`, SIG_CEN[1]);
-  const un=_placeAt('(…………………………….………..)', SIG_CEN[2]);
-  return _lineFrom([nm,bs,un]);
-}
-function buildA53(bossTitle){
-  const d1=_placeAt('………/………./………', SIG_CEN[0]);
-  const tt=_placeAt(bossTitle||'', SIG_CEN[1]);
-  const d3=_placeAt('………../………./……….', SIG_CEN[2]);
-  return _lineFrom([d1,tt,d3]);
-}
+/* ===== ช่องเซ็นชื่อ: แบ่ง 3 ช่องเท่า ๆ กัน (A–F / G–K / L–T) แล้วให้ Excel จัดกึ่งกลางเอง =====
+   - แถวบน (50–51) = บรรทัด (ลงชื่อ)…  จัดให้จุดไข่ปลาอยู่กึ่งกลางช่อง (ถ่วงด้วยช่องว่างซ้าย)
+   - แถว 52 = ชื่อในวงเล็บ จัดกึ่งกลาง  → ตรงใต้จุดไข่ปลา
+   - แถว 53 = วันที่ / ตำแหน่งผู้อนุมัติ จัดกึ่งกลาง → ตรงใต้ชื่อ */
+function vlen(s){ return [...String(s)].filter(ch=>!/[\u0E31\u0E34-\u0E3A\u0E47-\u0E4E]/.test(ch)).length; } // นับความกว้างจริง (ตัดสระ/วรรณยุกต์ที่ซ้อนบน-ล่าง)
 function bossTitleOf(name){ const b=(S.bosses||[]).find(x=>x.name===name); return b?b.title:(S.settings.bossTitle||''); }
+function applySignatureBlock(ws, name, boss, title){
+  const NB='\u00A0'; const thin={style:'thin',color:{argb:'FF000000'}};
+  const col=n=>String.fromCharCode(64+n);
+  const sigPre='(ลงชื่อ)'; const dots='…'.repeat(15);
+  const labels=['ผู้ขอเบิก','ผู้บังคับบัญชาขั้นต้น','ผู้บังคับบัญชาหน่วยงาน'];
+  const sig=labels.map(L=> NB.repeat(Math.max(0, vlen(L)-vlen(sigPre))) + sigPre + dots + L );
+  const phone='  เบอร์ภายใน…………..';
+  const nameCell = NB.repeat(vlen(phone)) + `(${name})` + phone;
+  const bossCell = `(…........${boss}........)`;
+  const unitCell = '(…………………………….………..)';
+  // 1) ยกเลิก merge เต็มแถวเดิม + ล้างค่าในโซน (unMergeCells จะล้างเส้นขอบทิ้งด้วย)
+  ['A50:T51','A52:T52','A53:T53'].forEach(r=>{ try{ ws.unMergeCells(r); }catch(e){} });
+  for(let row=50; row<=53; row++) for(let c=1;c<=20;c++){ try{ ws.getCell(row,c).value=null; }catch(e){} }
+  // 2) merge ใหม่เป็น 3 ช่องเท่า ๆ กัน
+  [['A50:F51','G50:K51','L50:T51'],['A52:F52','G52:K52','L52:T52'],['A53:F53','G53:K53','L53:T53']]
+    .forEach(set=>set.forEach(r=>{ try{ ws.mergeCells(r); }catch(e){} }));
+  // 3) สร้างกรอบใหม่: ขอบบน(แถว50) ขอบล่าง(แถว53) ขอบซ้าย(คอลัมน์ A) ขอบขวา(คอลัมน์ T) — ไม่มีเส้นภายใน
+  for(let c=1;c<=20;c++){ const t=ws.getCell(col(c)+'50'); t.border=Object.assign({},t.border,{top:thin});
+                          const b=ws.getCell(col(c)+'53'); b.border=Object.assign({},b.border,{bottom:thin}); }
+  for(let r=50;r<=53;r++){ const a=ws.getCell('A'+r); a.border=Object.assign({},a.border,{left:thin});
+                           const t=ws.getCell('T'+r); t.border=Object.assign({},t.border,{right:thin}); }
+  // 4) ใส่ค่า + จัดกึ่งกลาง + ฟอนต์เดิม
+  const put=(addr,val,valign)=>{ const cell=ws.getCell(addr); cell.value=val;
+    cell.alignment={horizontal:'center', vertical:valign||'center', wrapText:false};
+    cell.font={name:'Cordia New', size:16, charset:134}; };
+  put('A50',sig[0],'bottom'); put('G50',sig[1],'bottom'); put('L50',sig[2],'bottom');
+  put('A52',nameCell); put('G52',bossCell); put('L52',unitCell);
+  put('A53','………/………./………'); put('G53',title||''); put('L53','………../………./……….');
+}
 function buildE4(st){ return `ตามคำสั่ง/อนุมัติที่……${st.ord1}……..........${st.ord2}…..…….ลงวันที่……${st.ordDay}….${st.ordMon}….. ${st.ordYear}.........……..ให้ข้าพเจ้าเดินทางไปปฏิบัติงาน…….…${st.workType}……….........................................`; }
 function buildE5(st,loc){ return `ที่…….............${loc.place}......……………………..ข้าพเจ้าได้ออกจากที่พักโดยพาหนะ……${st.vehicle}............................................................………`; }
 function buildE6(sd,ed,tOutDep,tRetArr){ return `ตั้งแต่วันที่..${sd.getDate()}../……${thMon[sd.getMonth()]}............/…${be4(sd)}..….เวลา…${tOutDep}…….น.ถึงวันที่….${ed.getDate()}..../….${thMon[ed.getMonth()]}............/…${be4(ed)}..…เวลา……${tRetArr}…น. รวมเวลาปฏิบัติงานครั้งนี้`; }
@@ -761,8 +779,7 @@ async function generate(){
         ws.getCell('I'+(14+bi)).value=txt;
       });
       set('A16', st.remark); set('A31', A31); set('E31', st.workDesc);
-      set('A52', buildA52(p,st));
-      set('A53', buildA53(bossTitleOf(st.boss)));
+      applySignatureBlock(ws, p.name, st.boss, bossTitleOf(st.boss));
       // พิมพ์ให้เหมือนเดิมทุกชีท: ย้ำความกว้างคอลัมน์ + พื้นที่พิมพ์ + จัดกึ่งกลาง
       for(let c=1;c<=20;c++){ if(colW[c]!=null){ ws.getColumn(c).width = (colW[c]===9? 9.0001 : colW[c]); } }
       try{ ws.pageSetup.printArea='A1:T53'; ws.pageSetup.horizontalCentered=true; }catch(e){}
