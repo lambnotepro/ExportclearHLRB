@@ -631,11 +631,11 @@ function bossTitleOf(name){ const b=(S.bosses||[]).find(x=>x.name===name); retur
 function applySignatureBlock(ws, name, boss, title){
   const NB='\u00A0'; const thin={style:'thin',color:{argb:'FF000000'}};
   const col=n=>String.fromCharCode(64+n);
-  const sigPre='(ลงชื่อ)'; const dots='…'.repeat(15);
+  const sigPre='(ลงชื่อ)'; const dotN=[15,15,10];     // ช่องขวาสุด (label ยาวสุด+ช่องแคบกว่า) ลดจุดลงกันตัวอักษรตกขอบ
   const labels=['ผู้ขอเบิก','ผู้บังคับบัญชาขั้นต้น','ผู้บังคับบัญชาหน่วยงาน'];
-  const sig=labels.map(L=> NB.repeat(Math.max(0, vlen(L)-vlen(sigPre))) + sigPre + dots + L );
+  const sig=labels.map((L,i)=> NB.repeat(Math.max(0, vlen(L)-vlen(sigPre))) + sigPre + '…'.repeat(dotN[i]) + L );
   const phone='  เบอร์ภายใน…………..';
-  const nameCell = NB.repeat(vlen(phone)) + `(${name})` + phone;
+  const nameCell = NB.repeat(Math.round(vlen(phone)*1.25)) + `(${name})` + phone;  // ดันชื่อเข้ากึ่งกลางขึ้น (ฟอนต์ไทยกว้างกว่าช่องว่าง)
   const bossCell = `(…........${boss}........)`;
   const unitCell = '(…………………………….………..)';
   // 1) ยกเลิก merge เต็มแถวเดิม + ล้างค่าในโซน (unMergeCells จะล้างเส้นขอบทิ้งด้วย)
