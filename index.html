@@ -368,6 +368,13 @@ function applyLocTimes(){
   const l=curLoc();
   tOutDep.value=l.tOutDep; tOutArr.value=l.tOutArr; tRetDep.value=l.tRetDep; tRetArr.value=l.tRetArr;
 }
+/* เวลาที่ใช้จริงครั้งนี้ = ค่าที่กรอกในหน้า 1 (ถ้าว่างค่อย fallback ค่า default ของสถานที่) */
+function tripTimes(){
+  const l=curLoc();
+  const g=(id,def)=>{ const el=document.getElementById(id); const v=el&&el.value?el.value.trim():''; return v||def; };
+  return { tOutDep:g('tOutDep',l.tOutDep), tOutArr:g('tOutArr',l.tOutArr),
+           tRetDep:g('tRetDep',l.tRetDep), tRetArr:g('tRetArr',l.tRetArr) };
+}
 function showLocInfo(){
   const l=curLoc();
   document.getElementById('locInfo').innerHTML =
@@ -612,7 +619,17 @@ function delBoss(i){ if(S.bosses.length<=1){alert('ต้องมีผู้�
 /* ===== string builders (ตรงฟอร์มเดิม) ===== */
 function buildE1(loc){ return `เลขที่…………………………….     เลขที่ ตจ/กฟฟ…………………………..งบ……${loc.place}…….………..หมายเลขงาน…......................................................................................……`; }
 function buildE2(p,st){ return `ชื่อผู้เบิก…${p.name}…………….เลขประจำตัว…${p.id}………ตำแหน่ง……${p.pos}…….สังกัด……${st.dept}……………….รหัสแผนก…………………...………`; }
-function buildA52(p,st){ return `   (${p.name})  เบอร์ภายใน…………..                              (…....${st.boss}.….)                                                         (…………………………….………..)`; }
+function buildA52(p,st){
+  // วาง 3 บล็อกให้คอลัมน์ตรงใต้บรรทัด (ลงชื่อ)…  ของแถวบน (ตำแหน่ง “(” ที่คอลัมน์ 17 / 91 / 160)
+  const b1=`(${p.name})  เบอร์ภายใน…………..`;
+  const b2=`(…........${st.boss}........)`;
+  const b3=`(…………………………….………..)`;
+  const pad=(s,col)=> s + ' '.repeat(Math.max(1, col - s.length));
+  let s=' '.repeat(17)+b1;
+  s=pad(s,91)+b2;
+  s=pad(s,160)+b3;
+  return s;
+}
 function buildE4(st){ return `ตามคำสั่ง/อนุมัติที่……${st.ord1}……..........${st.ord2}…..…….ลงวันที่……${st.ordDay}….${st.ordMon}….. ${st.ordYear}.........……..ให้ข้าพเจ้าเดินทางไปปฏิบัติงาน…….…${st.workType}……….........................................`; }
 function buildE5(st,loc){ return `ที่…….............${loc.place}......……………………..ข้าพเจ้าได้ออกจากที่พักโดยพาหนะ……${st.vehicle}............................................................………`; }
 function buildE6(sd,ed,tOutDep,tRetArr){ return `ตั้งแต่วันที่..${sd.getDate()}../……${thMon[sd.getMonth()]}............/…${be4(sd)}..….เวลา…${tOutDep}…….น.ถึงวันที่….${ed.getDate()}..../….${thMon[ed.getMonth()]}............/…${be4(ed)}..…เวลา……${tRetArr}…น. รวมเวลาปฏิบัติงานครั้งนี้`; }
@@ -642,6 +659,7 @@ function renderPreview(){
   const idx=Math.min(+document.getElementById('pvSel').value||0, inc.length-1);
   const p=inc[idx], st=S.settings, loc=curLoc();
   const days=+nDays.value||0, nights=+nNights.value||0, pd=+st.perDiem||0, lo=lodgeRate(loc,p);
+  const tt=tripTimes();
   const aAmt=pd*days, bAmt=lo*nights, total=aAmt+bAmt;
   const bgRows=S.budgets.filter(b=>String(b.num).trim()!=='').map(b=>
     `<div class="ln">${esc(b.num)}${b.note&&b.note.trim()?`  <span class="mini">(${esc(b.note)})</span>`:''}</div>`).join('') || '<div class="mini">— ไม่มีเลขงบ —</div>';
@@ -652,11 +670,11 @@ function renderPreview(){
      <div class="ln">ชื่อผู้เบิก <b>${esc(p.name)}</b> · เลขประจำตัว ${esc(p.id)} · ตำแหน่ง ${esc(p.pos)} · สังกัด ${esc(st.dept)}</div>
      <div class="ln">ตามคำสั่ง ${esc(st.ord1)} ${esc(st.ord2)} ลงวันที่ ${esc(st.ordDay)} ${esc(st.ordMon)} ${esc(st.ordYear)} · งาน ${esc(st.workType)}</div>
      <div class="ln">ที่ <b>${esc(loc.place)}</b> · พาหนะ ${esc(st.vehicle)}</div>
-     <div class="ln">ตั้งแต่ ${sd.getDate()}/${thMon[sd.getMonth()]}/${be4(sd)} เวลา ${esc(loc.tOutDep)} น. ถึง ${ed.getDate()}/${thMon[ed.getMonth()]}/${be4(ed)} เวลา ${esc(loc.tRetArr)} น. · รวม <b>${days} วัน ${nights} คืน</b></div>
+     <div class="ln">ตั้งแต่ ${sd.getDate()}/${thMon[sd.getMonth()]}/${be4(sd)} เวลา ${esc(tt.tOutDep)} น. ถึง ${ed.getDate()}/${thMon[ed.getMonth()]}/${be4(ed)} เวลา ${esc(tt.tRetArr)} น. · รวม <b>${days} วัน ${nights} คืน</b></div>
      <table class="pvtab">
        <tr><th></th><th>ออกจาก</th><th>วันที่</th><th>เวลา</th><th>ถึง</th><th>วันที่</th><th>เวลา</th></tr>
-       <tr><td>ขาไป</td><td>${esc(loc.home)}</td><td>${shortDate(sd)}</td><td>${esc(loc.tOutDep)}</td><td>${esc(loc.dest)}</td><td>${shortDate(sd)}</td><td>${esc(loc.tOutArr)}</td></tr>
-       <tr><td>ขากลับ</td><td>${esc(loc.dest)}</td><td>${shortDate(ed)}</td><td>${esc(loc.tRetDep)}</td><td>${esc(loc.home)}</td><td>${shortDate(ed)}</td><td>${esc(loc.tRetArr)}</td></tr>
+       <tr><td>ขาไป</td><td>${esc(loc.home)}</td><td>${shortDate(sd)}</td><td>${esc(tt.tOutDep)}</td><td>${esc(loc.dest)}</td><td>${shortDate(sd)}</td><td>${esc(tt.tOutArr)}</td></tr>
+       <tr><td>ขากลับ</td><td>${esc(loc.dest)}</td><td>${shortDate(ed)}</td><td>${esc(tt.tRetDep)}</td><td>${esc(loc.home)}</td><td>${shortDate(ed)}</td><td>${esc(tt.tRetArr)}</td></tr>
      </table>
      <table class="pvtab">
        <tr><th class="l" style="text-align:left">รายการ</th><th>เรต</th><th>จำนวน</th><th>เป็นเงิน</th></tr>
@@ -688,7 +706,8 @@ async function generate(){
 
   const days=+nDays.value||0, nights=+nNights.value||0, pd=+st.perDiem||0;
   const sdS=shortDate(sd), edS=shortDate(ed);
-  const E1=buildE1(loc), E4=buildE4(st), E5=buildE5(st,loc), E6=buildE6(sd,ed,loc.tOutDep,loc.tRetArr), A31=buildA31(sd,ed);
+  const tt=tripTimes();
+  const E1=buildE1(loc), E4=buildE4(st), E5=buildE5(st,loc), E6=buildE6(sd,ed,tt.tOutDep,tt.tRetArr), A31=buildA31(sd,ed);
 
   try{
     status.className='status show ok'; status.textContent='⏳ กำลังสร้างไฟล์...';
@@ -711,10 +730,10 @@ async function generate(){
       set('E4', E4); set('E5', E5); set('E6', E6);
       set('Q6', days); set('S6', nights);
       // เดินทาง
-      set('A10', loc.home); set('B10', sdS); set('C10', loc.tOutDep+' น.');
-      set('D10', loc.dest); set('E10', sdS); set('F10', loc.tOutArr+' น.');
-      set('A11', loc.dest); set('B11', edS); set('C11', loc.tRetDep+' น.');
-      set('D11', loc.home); set('E11', edS); set('F11', loc.tRetArr+' น.');
+      set('A10', loc.home); set('B10', sdS); set('C10', tt.tOutDep+' น.');
+      set('D10', loc.dest); set('E10', sdS); set('F10', tt.tOutArr+' น.');
+      set('A11', loc.dest); set('B11', edS); set('C11', tt.tRetDep+' น.');
+      set('D11', loc.home); set('E11', edS); set('F11', tt.tRetArr+' น.');
       // เงิน (ค่าที่พักต่อคน)
       set('J11', pd); set('L11', days); set('J12', lo); set('L12', nights);
       ws.getCell('O11').value={formula:'J11*L11',result:aAmt};
