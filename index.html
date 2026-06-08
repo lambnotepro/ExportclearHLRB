@@ -207,7 +207,7 @@
 
     <div class="card">
       <h2><span class="num">✍</span> ผู้อนุมัติ</h2>
-      <div class="hint">รายชื่อผู้อนุมัติให้เลือกในหน้า 1 — <b>ตำแหน่งไม่พิมพ์ลงฟอร์ม</b> (มีตราประทับตำแหน่งอยู่แล้ว) ช่อง “ตำแหน่ง” ไว้ช่วยให้เลือกถูกคนเท่านั้น</div>
+      <div class="hint">รายชื่อผู้อนุมัติให้เลือกในหน้า 1 — <b>ตำแหน่งจะพิมพ์ใต้ลายเซ็น (แถวที่ 3 ของฟอร์ม)</b> ตามผู้อนุมัติที่เลือก แก้ชื่อ/ตำแหน่งได้เหมือนหน้าจัดการสถานที่</div>
       <div id="bossManager"></div>
       <button class="btn ghost sm" onclick="addBoss()" style="margin-top:10px">＋ เพิ่มผู้อนุมัติ</button>
     </div>
@@ -262,7 +262,7 @@ const DEFAULT = {
   ],
   bosses: [
     {name:'นายองอาจ ควรคิด', title:'หผ.ปบ.'},
-    {name:'นายธนา เนียมพิบูลย์', title:'ชผ.ปบ. รักษาการแทน'}
+    {name:'นายธนา เนียมพิบูลย์', title:'ชผ.ปบ.(รักษาการแทน หผ.ปบ.)'}
   ],
   settings: {
     ord1:'รบ.สน', ord2:'44/2569', ordDay:'30', ordMon:'เม.ย.', ordYear:'2569',
@@ -294,7 +294,8 @@ function migrate(r){
   (r.people||[]).forEach(p=>{ if(p.lvl==null) p.lvl=parseLvl(p.pos); });
   if(r.settings && r.settings.perDiem==null) r.settings.perDiem=255;
   if(!r.workDescs||!r.workDescs.length) r.workDescs=[ (r.settings&&r.settings.workDesc)||'ปฏิบัติงานด้านฮอทไลน์กระเช้า 22 kv' ];
-  if(!r.bosses||!r.bosses.length) r.bosses=[{name:'นายองอาจ ควรคิด',title:'หผ.ปบ.'},{name:'นายธนา เนียมพิบูลย์',title:'ชผ.ปบ. รักษาการแทน'}];
+  if(!r.bosses||!r.bosses.length) r.bosses=[{name:'นายองอาจ ควรคิด',title:'หผ.ปบ.'},{name:'นายธนา เนียมพิบูลย์',title:'ชผ.ปบ.(รักษาการแทน หผ.ปบ.)'}];
+  (r.bosses||[]).forEach(b=>{ if(b.title==='ชผ.ปบ. รักษาการแทน') b.title='ชผ.ปบ.(รักษาการแทน หผ.ปบ.)'; });
 }
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
 
@@ -497,7 +498,9 @@ function renderBossSel(){
   }
   if(!S.settings.boss && list[0]) S.settings.boss=list[0].name;
   sel.value=S.settings.boss;
-  sel.onchange=()=>{ S.settings.boss=sel.value; save(); };
+  const sync=()=>{ const b=(S.bosses||[]).find(x=>x.name===S.settings.boss); S.settings.bossTitle=b?b.title:''; };
+  sync();
+  sel.onchange=()=>{ S.settings.boss=sel.value; sync(); save(); };
 }
 
 /* ===== page 1: total ===== */
@@ -619,17 +622,23 @@ function delBoss(i){ if(S.bosses.length<=1){alert('ต้องมีผู้�
 /* ===== string builders (ตรงฟอร์มเดิม) ===== */
 function buildE1(loc){ return `เลขที่…………………………….     เลขที่ ตจ/กฟฟ…………………………..งบ……${loc.place}…….………..หมายเลขงาน…......................................................................................……`; }
 function buildE2(p,st){ return `ชื่อผู้เบิก…${p.name}…………….เลขประจำตัว…${p.id}………ตำแหน่ง……${p.pos}…….สังกัด……${st.dept}……………….รหัสแผนก…………………...………`; }
+/* จัดบล็อกให้ "กึ่งกลาง" ตรงช่องจุดไข่ปลาที่เว้นเซ็นของแถวบน (คอลัมน์กลาง ≈ 29.5 / 104.5 / 174) */
+const SIG_CEN=[29.5,104.5,174];
+function _placeAt(text,c){ return {start:Math.max(0,Math.round(c-text.length/2)), text}; }
+function _lineFrom(segs){ let s=''; for(const g of segs){ if(g.start>s.length) s+=' '.repeat(g.start-s.length); else if(s.length) s+=' '; s+=g.text; } return s; }
 function buildA52(p,st){
-  // วาง 3 บล็อกให้คอลัมน์ตรงใต้บรรทัด (ลงชื่อ)…  ของแถวบน (ตำแหน่ง “(” ที่คอลัมน์ 17 / 91 / 160)
-  const b1=`(${p.name})  เบอร์ภายใน…………..`;
-  const b2=`(…........${st.boss}........)`;
-  const b3=`(…………………………….………..)`;
-  const pad=(s,col)=> s + ' '.repeat(Math.max(1, col - s.length));
-  let s=' '.repeat(17)+b1;
-  s=pad(s,91)+b2;
-  s=pad(s,160)+b3;
-  return s;
+  const nm=_placeAt(`(${p.name})`, SIG_CEN[0]); nm.text+='  เบอร์ภายใน…………..';
+  const bs=_placeAt(`(…........${st.boss}........)`, SIG_CEN[1]);
+  const un=_placeAt('(…………………………….………..)', SIG_CEN[2]);
+  return _lineFrom([nm,bs,un]);
 }
+function buildA53(bossTitle){
+  const d1=_placeAt('………/………./………', SIG_CEN[0]);
+  const tt=_placeAt(bossTitle||'', SIG_CEN[1]);
+  const d3=_placeAt('………../………./……….', SIG_CEN[2]);
+  return _lineFrom([d1,tt,d3]);
+}
+function bossTitleOf(name){ const b=(S.bosses||[]).find(x=>x.name===name); return b?b.title:(S.settings.bossTitle||''); }
 function buildE4(st){ return `ตามคำสั่ง/อนุมัติที่……${st.ord1}……..........${st.ord2}…..…….ลงวันที่……${st.ordDay}….${st.ordMon}….. ${st.ordYear}.........……..ให้ข้าพเจ้าเดินทางไปปฏิบัติงาน…….…${st.workType}……….........................................`; }
 function buildE5(st,loc){ return `ที่…….............${loc.place}......……………………..ข้าพเจ้าได้ออกจากที่พักโดยพาหนะ……${st.vehicle}............................................................………`; }
 function buildE6(sd,ed,tOutDep,tRetArr){ return `ตั้งแต่วันที่..${sd.getDate()}../……${thMon[sd.getMonth()]}............/…${be4(sd)}..….เวลา…${tOutDep}…….น.ถึงวันที่….${ed.getDate()}..../….${thMon[ed.getMonth()]}............/…${be4(ed)}..…เวลา……${tRetArr}…น. รวมเวลาปฏิบัติงานครั้งนี้`; }
@@ -687,7 +696,7 @@ function renderPreview(){
      <div class="ln" style="margin-top:6px">วันที่ปฏิบัติงาน: <b>${buildA31(sd,ed)}</b></div>
      <div class="ln">รายละเอียดงาน: ${esc(st.workDesc)}</div>
      <div class="ln">หมายเหตุ: ${esc(st.remark)}</div>
-     <div class="ln">ผู้ขอเบิก: ${esc(p.name)} · ผู้อนุมัติ: ${esc(st.boss)}</div>
+     <div class="ln">ผู้ขอเบิก: ${esc(p.name)} · ผู้อนุมัติ: ${esc(st.boss)} <span class="mini">(${esc(bossTitleOf(st.boss))})</span></div>
      <div class="pvmoney">รวมเป็นเงินทั้งสิ้น <span class="big">${total.toLocaleString()} บาท</span><br>
        <span class="mini">(${bahtText(total)})</span></div>
    </div>`;
@@ -753,6 +762,7 @@ async function generate(){
       });
       set('A16', st.remark); set('A31', A31); set('E31', st.workDesc);
       set('A52', buildA52(p,st));
+      set('A53', buildA53(bossTitleOf(st.boss)));
       // พิมพ์ให้เหมือนเดิมทุกชีท: ย้ำความกว้างคอลัมน์ + พื้นที่พิมพ์ + จัดกึ่งกลาง
       for(let c=1;c<=20;c++){ if(colW[c]!=null){ ws.getColumn(c).width = (colW[c]===9? 9.0001 : colW[c]); } }
       try{ ws.pageSetup.printArea='A1:T53'; ws.pageSetup.horizontalCentered=true; }catch(e){}
